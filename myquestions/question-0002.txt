@@ -1,0 +1,12 @@
+PREGUNTA 0002 - Detección de Anomalías en Tráfico de Red
+Un sistema de monitoreo registra conexiones de red. Sin etiquetas previas, debes identificar comportamientos anómalos usando un modelo no supervisado.
+
+Nombre: detectar_anomalias_red
+Argumentos:
+
+df (pandas.DataFrame): Dataset con columnas duracion, bytes_enviados, bytes_recibidos, num_conexiones, puerto_destino.
+
+
+Retorna:
+
+dict: {'df_resultado': pd.DataFrame, 'porcentaje_anomalias': float, 'modelo': IsolationForest}

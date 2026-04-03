@@ -1,0 +1,13 @@
+PREGUNTA 0004 - Clustering en Ecología Acústica
+Grabaciones de ecosistemas generan características acústicas por segundo. Sin etiquetas, debes agrupar los paisajes sonoros en clusters y evaluar su calidad.
+
+Nombre: segmentar_paisajes_sonoros
+Argumentos:
+
+df (pandas.DataFrame): Dataset con columnas intensidad_media, intensidad_max, frecuencia_media, frecuencia_dominante, diversidad_espectral, timestamp.
+n_clusters (int): Número de grupos a formar.
+
+
+Retorna:
+
+dict: {'labels': np.ndarray, 'silhouette': float, 'varianza_explicada_pca': list[float]}

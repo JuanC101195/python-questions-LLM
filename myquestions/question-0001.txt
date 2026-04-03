@@ -1,0 +1,13 @@
+PREGUNTA 0001 - Clasificación Binaria en Astrofísica
+Un radiotelescopio registra señales astronómicas con ruido e interferencias. Debes limpiar los datos, construir un pipeline de preprocesamiento y clasificar si cada pulso proviene de una estrella de neutrones o de otra fuente.
+
+Nombre: clasificar_pulsos_radio
+Argumentos:
+
+df (pandas.DataFrame): Dataset con columnas frecuencia_central, ancho_banda, flujo, relacion_señal_ruido y la columna objetivo.
+target_col (str): Nombre de la columna objetivo.
+
+
+Retorna:
+
+dict: {'modelo': KNeighborsClassifier, 'accuracy': float}

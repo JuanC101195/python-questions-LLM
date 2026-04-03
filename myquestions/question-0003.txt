@@ -1,0 +1,13 @@
+PREGUNTA 0003 - Regresión en Redes Sociales
+Un dataset contiene métricas de memes virales. Las variables son asimétricas y la hora de publicación es cíclica. Debes predecir el puntaje de popularidad continuo.
+
+Nombre: predecir_popularidad_meme
+Argumentos:
+
+df (pandas.DataFrame): Dataset con columnas likes, shares, longitud_texto, numero_hashtags, tiempo_publicacion y la columna objetivo.
+target_col (str): Nombre de la columna objetivo.
+
+
+Retorna:
+
+dict: {'modelo': RandomForestRegressor, 'rmse': float, 'n_features_seleccionadas': int}
