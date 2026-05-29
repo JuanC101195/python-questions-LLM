@@ -1,0 +1,82 @@
+DIAGNOSTICO DE RESPUESTAS - FASE 2
+====================================
+
+Autor: Juan Esteban Cardozo Rivera
+Correo: juan.cardozor@udea.edu.co
+
+
+answer-0550.py  (clasificar_riesgo_binario)
+-------------------------------------------
+Correcta. Coincide con el output del generador en todas las iteraciones probadas.
+
+
+answer-0313.py  (eliminar_multicolinealidad)
+--------------------------------------------
+Correcta. Coincide con el output del generador en todas las iteraciones probadas.
+
+
+answer-0380.py  (clasificar_resultado_con_mlp)
+----------------------------------------------
+Correcta. Coincide con el output del generador (accuracy y f1_score) en todas
+las iteraciones probadas. Las ConvergenceWarning de MLPClassifier son las
+mismas que dispara el ground truth del propio generador y no afectan el match.
+
+
+answer-0563.py  (evaluar_clusters_por_periodo)
+----------------------------------------------
+Mi solución implementa correctamente la función segun el enunciado de la pregunta
+0003 del repo del compañero
+(https://github.com/mariacamilaberriopavas/Laboratorio1-LLMS/blob/main/myquestions/question-0003.txt):
+
+  - Convierte fecha_col a datetime (answer-0563.py linea 12).
+  - Extrae el trimestre en formato YYYY-QX (lineas 13-17).
+  - Ordena cronologicamente los trimestres unicos (linea 19).
+  - Selecciona unicamente columnas numericas excluyendo fecha_col (lineas 21-25).
+  - Omite trimestres con menos de k_min * 2 filas (linea 30).
+  - Imputa con SimpleImputer(strategy='mean') y escala con StandardScaler,
+    ajustados unicamente sobre los datos del trimestre (lineas 33-34).
+  - Prueba k entre k_min y k_max con KMeans(random_state=42, n_init=10) y
+    calcula silhouette_score (lineas 36-46).
+  - Selecciona el k con mayor silhouette y conserva el menor k en caso de empate
+    (la comparacion estricta '>' en linea 45 cumple esto: el primer k probado
+    es k_min y solo se reemplaza si otro k da un silhouette estrictamente mayor).
+  - Devuelve un DataFrame con las columnas ['trimestre', 'mejor_k',
+    'silhouette_score'] con indice reiniciado (lineas 56-58).
+
+Sin embargo, esperamos que el validador automatico la clasifique como
+'usecase generator errors' o como 'answers incorrect' por un defecto en el
+GENERADOR DE CASOS DE USO del compañero
+(https://github.com/mariacamilaberriopavas/Laboratorio1-LLMS/blob/main/myquestions/question-0003-usecase-generator.py):
+
+  - La rubrica del ejercicio especifica que cada caso de uso debe devolver una
+    tupla (input_dict, output_esperado) donde input_dict tiene los argumentos
+    de la funcion y output_esperado es el valor que se espera que la funcion
+    produzca.
+
+  - El generador del compañero, en su linea 63, hace:
+        return enunciado, datos
+    donde 'enunciado' (lineas 33-59) es un diccionario con METADATOS del
+    problema ("titulo", "descripcion", "funcion", "argumentos", "retorno",
+    "instrucciones") y NO contiene las claves 'df', 'fecha_col', 'k_min',
+    'k_max' que necesitaria mi funcion.
+    Y 'datos' (linea 61) es una tupla (df, "fecha", k_min, k_max) que en
+    realidad contiene los ARGUMENTOS de entrada y NO el DataFrame de salida
+    esperado.
+
+  - Por tanto, cuando el validador automatico haga
+        input_data, output_data = generar_caso_de_uso_evaluar_clusters_por_periodo()
+        resultado = evaluar_clusters_por_periodo(**input_data)
+    fallara con TypeError porque 'titulo', 'descripcion', etc. no son
+    argumentos validos de la funcion. Y aun si por accidente desempaquetara
+    'datos', la comparacion con output_data (que es la tupla de inputs) jamas
+    podra dar correcta.
+
+Verificacion local: al invocar mi solucion pasando directamente los argumentos
+correctos extraidos de la tupla 'datos' del generador, mi funcion corre sin
+errores en todas las iteraciones probadas y devuelve un DataFrame con la
+estructura y orden requeridos (entre 3 y 6 filas dependiendo del numero de
+trimestres validos en cada caso aleatorio).
+
+Conclusion: el answer-0563.py implementa correctamente la funcion solicitada.
+La discrepancia con el validador automatico es ajena a mi solucion y se debe
+exclusivamente al contrato roto del generador de casos de uso del compañero.
