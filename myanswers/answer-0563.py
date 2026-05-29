@@ -9,11 +9,7 @@ from sklearn.metrics import silhouette_score
 def evaluar_clusters_por_periodo(df, fecha_col, k_min=2, k_max=5):
     df = df.copy()
     df[fecha_col] = pd.to_datetime(df[fecha_col])
-    df["__trimestre__"] = (
-        df[fecha_col].dt.year.astype(str)
-        + "-Q"
-        + df[fecha_col].dt.quarter.astype(str)
-    )
+    df["__trimestre__"] = df[fecha_col].dt.to_period("Q").astype(str)
 
     trimestres = sorted(df["__trimestre__"].unique())
 
