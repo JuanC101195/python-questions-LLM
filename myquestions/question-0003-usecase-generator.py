@@ -1,94 +1,92 @@
 import numpy as np
 import pandas as pd
 from sklearn.impute import SimpleImputer
-from sklearn.linear_model import Ridge
-from sklearn.model_selection import cross_val_score
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import PowerTransformer
+from sklearn.feature_selection import SelectPercentile, f_regression
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_squared_error
 
 
-def evaluar_regularizacion_ridge(df, target_col, alphas):
-    # Separar X e y
-    X = df.drop(columns=[target_col])
-    y = df[target_col]
-
-    # Seleccionar solo columnas numéricas
-    X = X.select_dtypes(include=[np.number])
-
-    resultados = {}
-
-    for alpha in alphas:
-        modelo = Pipeline([
-            ("imputer", SimpleImputer(strategy="mean")),
-            ("scaler", StandardScaler()),
-            ("ridge", Ridge(alpha=alpha))
-        ])
-
-        scores = cross_val_score(
-            modelo,
-            X,
-            y,
-            cv=5,
-            scoring="neg_mean_squared_error"
-        )
-
-        rmse_promedio = float(np.mean(np.sqrt(-scores)))
-        resultados[alpha] = rmse_promedio
-
-    mejor_alpha = min(resultados, key=resultados.get)
-    mejor_rmse = resultados[mejor_alpha]
-
-    return resultados, mejor_alpha, mejor_rmse
-
-
-def generar_caso_de_uso_evaluar_regularizacion_ridge():
+def generar_caso_de_uso_predecir_popularidad_meme():
     rng = np.random.default_rng()
 
-    n_filas = int(rng.integers(60, 120))
-    n_features = int(rng.integers(4, 8))
+    n_filas = int(rng.integers(100, 501))
 
-    data = {}
+    likes = rng.gamma(shape=2.0, scale=500.0, size=n_filas)
+    shares = (rng.pareto(a=1.5, size=n_filas) + 1.0) * 50.0
+    longitud_texto = rng.integers(20, 281, size=n_filas).astype(float)
+    numero_hashtags = rng.integers(0, 16, size=n_filas).astype(float)
+    tiempo_publicacion = rng.integers(0, 24, size=n_filas).astype(float)
 
-    for i in range(n_features):
-        col = rng.normal(loc=0, scale=1, size=n_filas)
+    popularidad = (
+        np.log1p(likes) * 5.0
+        + np.log1p(shares) * 8.0
+        + np.sqrt(numero_hashtags) * 2.0
+        - np.abs(tiempo_publicacion - 18) * 0.5
+        + rng.normal(0, 3.0, size=n_filas)
+    )
+    pmin, pmax = popularidad.min(), popularidad.max()
+    if pmax > pmin:
+        popularidad = (popularidad - pmin) / (pmax - pmin) * 100.0
 
-        # Introducir algunos valores faltantes
-        mask = rng.random(n_filas) < 0.1
-        col[mask] = np.nan
+    df = pd.DataFrame({
+        "likes": likes,
+        "shares": shares,
+        "longitud_texto": longitud_texto,
+        "numero_hashtags": numero_hashtags,
+        "tiempo_publicacion": tiempo_publicacion,
+        "popularidad": popularidad,
+    })
 
-        data[f"feature_{i}"] = col
+    target_col = "popularidad"
 
-    df = pd.DataFrame(data)
+    feature_cols = [c for c in df.columns if c != target_col]
+    for col in feature_cols:
+        mask = rng.random(n_filas) < 0.10
+        df.loc[mask, col] = np.nan
 
-    # Crear target continua a partir de combinación lineal de variables
-    X_temp = df.fillna(df.mean())
-    coeficientes = rng.uniform(-3, 3, size=n_features)
-    ruido = rng.normal(0, 0.5, size=n_filas)
+    input_data = {"df": df.copy(), "target_col": target_col}
 
-    y = X_temp.to_numpy() @ coeficientes + ruido
-    df["target"] = y
+    X = df.drop(columns=[target_col])
+    y = df[target_col].to_numpy()
 
-    alphas_disponibles = [0.01, 0.1, 1.0, 10.0, 100.0]
-    cantidad_alphas = int(rng.integers(3, len(alphas_disponibles) + 1))
-    alphas = [float(a) for a in rng.choice(alphas_disponibles, size=cantidad_alphas, replace=False)]
-    alphas.sort()
+    imputer = SimpleImputer(strategy="median")
+    X_imp = imputer.fit_transform(X)
+    X_imp_df = pd.DataFrame(X_imp, columns=X.columns)
 
-    input_data = {
-        "df": df,
-        "target_col": "target",
-        "alphas": alphas
+    hora = X_imp_df["tiempo_publicacion"].to_numpy()
+
+    pt = PowerTransformer(method="yeo-johnson")
+    X_pt = pt.fit_transform(X_imp)
+    X_pt_df = pd.DataFrame(X_pt, columns=X.columns)
+
+    X_pt_df["hora_sin"] = np.sin(2 * np.pi * hora / 24)
+    X_pt_df["hora_cos"] = np.cos(2 * np.pi * hora / 24)
+    X_pt_df = X_pt_df.drop(columns=["tiempo_publicacion"])
+
+    selector = SelectPercentile(score_func=f_regression, percentile=60)
+    X_sel = selector.fit_transform(X_pt_df.to_numpy(), y)
+    n_features_seleccionadas = int(X_sel.shape[1])
+
+    modelo = RandomForestRegressor(n_estimators=100, random_state=42)
+    modelo.fit(X_sel, y)
+    y_pred = modelo.predict(X_sel)
+    rmse = round(float(np.sqrt(mean_squared_error(y, y_pred))), 4)
+
+    output_data = {
+        "modelo": modelo,
+        "rmse": rmse,
+        "n_features_seleccionadas": n_features_seleccionadas,
     }
-
-    output_data = evaluar_regularizacion_ridge(df, "target", alphas)
 
     return input_data, output_data
 
 
 if __name__ == "__main__":
-    input_data, output_data = generar_caso_de_uso_evaluar_regularizacion_ridge()
-
+    input_data, output_data = generar_caso_de_uso_predecir_popularidad_meme()
     print("INPUT:")
-    print(input_data)
-
+    print(f"target_col: {input_data['target_col']}")
+    print(input_data["df"].head())
     print("\nOUTPUT:")
-    print(output_data)
+    print(f"rmse: {output_data['rmse']}")
+    print(f"n_features_seleccionadas: {output_data['n_features_seleccionadas']}")

@@ -1,59 +1,78 @@
 import numpy as np
 import pandas as pd
-from sklearn.decomposition import NMF
+from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import RobustScaler
+from sklearn.decomposition import PCA
+from sklearn.cluster import AgglomerativeClustering
+from sklearn.metrics import silhouette_score
 
 
-def extraer_patrones_consumo(df, n_components):
-    X = df.to_numpy()
-
-    modelo = NMF(
-        n_components=n_components,
-        init="random",
-        random_state=42,
-        max_iter=500
-    )
-
-    W = modelo.fit_transform(X)
-    H = modelo.components_
-
-    X_reconstruida = np.dot(W, H)
-    rmse = float(np.sqrt(np.mean((X - X_reconstruida) ** 2)))
-
-    return W, H, rmse
-
-
-def generar_caso_de_uso_extraer_patrones_consumo():
+def generar_caso_de_uso_segmentar_paisajes_sonoros():
     rng = np.random.default_rng()
 
-    n_muestras = int(rng.integers(20, 60))
-    n_features = int(rng.integers(5, 10))
+    n_filas = int(rng.integers(80, 301))
+    n_clusters = int(rng.integers(2, 5))
 
-    data = rng.uniform(0, 100, size=(n_muestras, n_features))
+    intensidad_media = rng.normal(loc=60.0, scale=10.0, size=n_filas)
+    intensidad_max = intensidad_media + rng.normal(loc=10.0, scale=3.0, size=n_filas)
+    frecuencia_media = rng.gamma(shape=3.0, scale=1000.0, size=n_filas)
+    frecuencia_dominante = frecuencia_media * rng.uniform(0.8, 1.5, size=n_filas)
+    diversidad_espectral = rng.uniform(0.0, 5.0, size=n_filas)
+    timestamp = np.arange(n_filas, dtype=float)
 
-    columnas = [f"franja_{i}" for i in range(n_features)]
-    df = pd.DataFrame(data, columns=columnas)
+    df = pd.DataFrame({
+        "intensidad_media": intensidad_media,
+        "intensidad_max": intensidad_max,
+        "frecuencia_media": frecuencia_media,
+        "frecuencia_dominante": frecuencia_dominante,
+        "diversidad_espectral": diversidad_espectral,
+        "timestamp": timestamp,
+    })
 
-    max_componentes = min(n_muestras, n_features)
-    if max_componentes <= 2:
-        n_components = 1
+    for col in df.columns:
+        if col == "timestamp":
+            continue
+        mask = rng.random(n_filas) < 0.10
+        df.loc[mask, col] = np.nan
+
+    input_data = {"df": df.copy(), "n_clusters": n_clusters}
+
+    X = df.drop(columns=["timestamp"])
+    imputer = SimpleImputer(strategy="median")
+    X_imp = imputer.fit_transform(X)
+
+    scaler = RobustScaler()
+    X_scaled = scaler.fit_transform(X_imp)
+
+    pca = PCA(n_components=2)
+    X_pca = pca.fit_transform(X_scaled)
+    varianza_explicada_pca = [float(v) for v in pca.explained_variance_ratio_]
+
+    modelo_cluster = AgglomerativeClustering(n_clusters=n_clusters, linkage="ward")
+    labels = modelo_cluster.fit_predict(X_pca)
+
+    if len(np.unique(labels)) < 2:
+        silhouette = -1.0
     else:
-        n_components = int(rng.integers(2, max_componentes))
+        silhouette = round(
+            float(silhouette_score(X_scaled, labels, metric="euclidean")), 4
+        )
 
-    input_data = {
-        "df": df,
-        "n_components": n_components
+    output_data = {
+        "labels": labels,
+        "silhouette": silhouette,
+        "varianza_explicada_pca": varianza_explicada_pca,
     }
-
-    output_data = extraer_patrones_consumo(df, n_components)
 
     return input_data, output_data
 
 
 if __name__ == "__main__":
-    input_data, output_data = generar_caso_de_uso_extraer_patrones_consumo()
-
+    input_data, output_data = generar_caso_de_uso_segmentar_paisajes_sonoros()
     print("INPUT:")
-    print(input_data)
-
+    print(f"n_clusters: {input_data['n_clusters']}")
+    print(input_data["df"].head())
     print("\nOUTPUT:")
-    print(output_data)
+    print(f"silhouette: {output_data['silhouette']}")
+    print(f"varianza_explicada_pca: {output_data['varianza_explicada_pca']}")
+    print(f"labels (primeras 10): {output_data['labels'][:10]}")

@@ -1,75 +1,68 @@
 import numpy as np
 import pandas as pd
+from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import QuantileTransformer, StandardScaler
+from sklearn.neighbors import KNeighborsClassifier
 
 
-def eliminar_multicolinealidad(df, threshold):
-    # Seleccionar columnas numéricas
-    df_numeric = df.select_dtypes(include=[np.number])
+def generar_caso_de_uso_clasificar_pulsos_radio():
+    rng = np.random.default_rng()
 
-    # Calcular matriz de correlación absoluta
-    corr_matrix = df_numeric.corr().abs()
+    n_filas = int(rng.integers(50, 201))
 
-    # Tomar solo la parte superior de la matriz
-    upper_triangle = corr_matrix.where(
-        np.triu(np.ones(corr_matrix.shape), k=1).astype(bool)
-    )
+    frecuencia_central = rng.gamma(shape=2.0, scale=200.0, size=n_filas)
+    ancho_banda = rng.exponential(scale=15.0, size=n_filas)
+    flujo = rng.gamma(shape=1.5, scale=5.0, size=n_filas)
+    snr = rng.exponential(scale=8.0, size=n_filas)
 
-    # Identificar columnas a eliminar
-    columnas_eliminadas = [
-        column for column in upper_triangle.columns
-        if any(upper_triangle[column] > threshold)
-    ]
+    es_neutron = ((flujo > np.median(flujo)) & (snr > np.median(snr))).astype(int)
 
-    # Eliminar columnas
-    df_filtrado = df_numeric.drop(columns=columnas_eliminadas)
+    df = pd.DataFrame({
+        "frecuencia_central": frecuencia_central,
+        "ancho_banda": ancho_banda,
+        "flujo": flujo,
+        "relacion_señal_ruido": snr,
+        "es_neutron": es_neutron,
+    })
 
-    return df_filtrado, columnas_eliminadas
+    target_col = "es_neutron"
 
+    feature_cols = [c for c in df.columns if c != target_col]
+    for col in feature_cols:
+        mask = rng.random(n_filas) < 0.10
+        df.loc[mask, col] = np.nan
 
-def generar_caso_de_uso_eliminar_multicolinealidad():
-    np.random.seed()
-
-    # Número aleatorio de filas y columnas
-    n_filas = np.random.randint(30, 100)
-    n_cols = np.random.randint(4, 8)
-
-    data = {}
-
-    # Generar columnas base
-    for i in range(n_cols):
-        data[f"col_{i}"] = np.random.randn(n_filas)
-
-    df = pd.DataFrame(data)
-
-    # Introducir correlación artificial (clave para que el caso no sea trivial)
-    if n_cols >= 2:
-        col_base = np.random.choice(df.columns)
-        col_nueva = np.random.choice(df.columns)
-
-        if col_base != col_nueva:
-            df[col_nueva] = df[col_base] * (0.8 + 0.2 * np.random.rand())
-
-    # Threshold aleatorio
-    threshold = np.random.uniform(0.7, 0.95)
-
-    # Crear input
     input_data = {
-        "df": df,
-        "threshold": threshold
+        "df": df.copy(),
+        "target_col": target_col,
     }
 
-    # Calcular output esperado
-    df_filtrado, columnas_eliminadas = eliminar_multicolinealidad(df, threshold)
+    X = df.drop(columns=[target_col])
+    y = df[target_col].to_numpy()
 
-    output_data = (df_filtrado, columnas_eliminadas)
+    imputer = SimpleImputer(strategy="median")
+    X_imp = imputer.fit_transform(X)
+
+    qt = QuantileTransformer(output_distribution="uniform", random_state=42)
+    X_qt = qt.fit_transform(X_imp)
+
+    scaler = StandardScaler()
+    X_proc = scaler.fit_transform(X_qt)
+
+    modelo = KNeighborsClassifier(n_neighbors=5)
+    modelo.fit(X_proc, y)
+    accuracy = round(float(modelo.score(X_proc, y)), 4)
+
+    output_data = {"modelo": modelo, "accuracy": accuracy}
 
     return input_data, output_data
 
 
 if __name__ == "__main__":
-    input_data, output_data = generar_caso_de_uso_eliminar_multicolinealidad()
-
+    input_data, output_data = generar_caso_de_uso_clasificar_pulsos_radio()
     print("INPUT:")
-    print(input_data)
+    print(f"target_col: {input_data['target_col']}")
+    print(input_data["df"].head())
     print("\nOUTPUT:")
-    print(output_data)
+    print(f"modelo: {output_data['modelo']}")
+    print(f"accuracy: {output_data['accuracy']}")
